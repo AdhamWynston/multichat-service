@@ -14,4 +14,3 @@
 $router->get('/', function () use ($router) {
     return $router->app->version();
 });
-$app->post('message','MessageController@store');
