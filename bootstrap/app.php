@@ -23,9 +23,89 @@ $app = new Laravel\Lumen\Application(
     realpath(__DIR__.'/../')
 );
 
-// $app->withFacades();
+ $app->withFacades();
 
-// $app->withEloquent();
+ $app->withEloquent();
+use Illuminate\Support\Facades\Log;
+use Aws\Sns\Message;
+config([
+    'sns' => [
+        // The credentials needed for the AWS client
+        'client'        => [
+            'id'      => env('AWS_ACCOUNT_ID'),
+            'key'     => env('AWS_ACCESS_KEY'),
+            'secret'  => env('AWS_SECRET_KEY'),
+            'region'  => env('AWS_REGION'),
+            'version' => 'latest',
+        ],
+
+        // The base URL for each of the routes, which is used to give SNS the right subscription endpoints
+        'url'           => rtrim(env('APP_URL'), '/'),
+
+        // Suitable defaults
+        'defaults'      => [
+            'topics' => [
+                'region'  => env('AWS_REGION'),
+                'id'      => env('AWS_ACCOUNT_ID'),
+                'prefix'  => str_slug(env('APP_NAME')),
+                'joiner'  => '_',
+                'formARN' => function ($region, $id, $prefix, $joiner, $topic) {
+                    // This default joiner will form ARNs similar to arn:aws:sns:us-east-2:1234567890:app-name_test-broadcast
+                    $output = 'arn:aws:sns:' . $region . ':' . $id . ':';
+
+                    if (!empty($prefix)) {
+                        $output .= $prefix . $joiner;
+                    }
+
+                    return $output . $topic;
+                },
+            ],
+
+            'subscriptions' => [
+                // This will be the default route for all subscriptions
+                'route' => '/sns',
+            ],
+        ],
+
+        // The topics and their matching ARNs, which can be created with
+        // php artisan sns:create
+        'topics'        => [
+            // The ARN can be formed using the defaults above
+            'test-broadcast',
+
+            // You can also define the ARN directly
+            //'test-broadcast-arn' => 'arn:aws:sns:us-east-2:1234567890:test-broadcast-arn',
+        ],
+
+        // The topics to be subscribed to, and their matching actions
+        'subscriptions' => [
+            'test-broadcast' => [
+                // 'controller' => 'BroadcastController@testBroadcast',
+                // 'job'        => 'TestBroadcastJob',
+                'callback' => function (Message $message) {
+                    // Log::info('Broadcast received from ARN "' . $message->offsetGet('TopicArn') . '" with Message "' . $message->offsetGet('Message') . '".');
+                },
+            ],
+
+            /*'test-broadcast-arn' => [
+                // You can also dispatch an array of actions
+                'controller' => [
+                    'BroadcastController@testBroadcastARN',
+                ],
+                'job'        => [
+                    'TestBroadcastARNJob',
+                ],
+                'callback'   => [
+                    function (\Aws\Sns\Message $message) {
+                        // Log::info('Broadcast received from ARN "' . $message->offsetGet('TopicArn') . '" with Message "' . $message->offsetGet('Message') . '".');
+                    },
+                ],
+                // You can override the route on a per-subscription basis
+                // 'route'      => '/sns/test-broadcast-arn',
+            ],*/
+        ],
+    ],
+]);
 
 /*
 |--------------------------------------------------------------------------
@@ -47,6 +127,8 @@ $app->singleton(
     Illuminate\Contracts\Console\Kernel::class,
     App\Console\Kernel::class
 );
+$app->register(Mitchdav\SNS\LumenProvider::class);
+$app->register(Flipbox\LumenGenerator\LumenGeneratorServiceProvider::class);
 
 /*
 |--------------------------------------------------------------------------
@@ -93,6 +175,21 @@ $app->singleton(
 |
 */
 
+config([
+    'broadcasting' => [
+
+        'default' => env('BROADCAST_DRIVER', 'null'),
+
+        'connections' => [
+
+            'sns' => [
+                'driver' => 'sns',
+            ],
+
+        ],
+
+    ],
+]);
 $app->router->group([
     'namespace' => 'App\Http\Controllers',
 ], function ($router) {

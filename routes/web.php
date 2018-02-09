@@ -14,3 +14,6 @@
 $router->get('/', function () use ($router) {
     return $router->app->version();
 });
+$router->get('/chat', function () use ($router) {
+    dd(event(new \App\Notifications\RequestReceived("123")));
+});
